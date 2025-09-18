@@ -132,7 +132,11 @@ def main():
     
     # Load model
     classifier = load_model()
-    
+
+    # Initialize prediction history
+    if "history" not in st.session_state:
+        st.session_state.history = []
+
     # Instructions
     with st.expander("📋 Instructions", expanded=False):
         st.write("""
@@ -142,7 +146,7 @@ def main():
         - Image will be automatically resized to 64x64 pixels
         - The AI model will predict the digit and show confidence score
         """)
-    
+
     # File uploader
     st.markdown("### 📁 Upload Your Image")
     uploaded_file = st.file_uploader(
@@ -150,7 +154,7 @@ def main():
         type=['png', 'jpg', 'jpeg', 'gif'],
         help="Upload a clear image of a handwritten digit"
     )
-    
+
     if uploaded_file is not None:
         # Display uploaded image
         col1, col2, col3 = st.columns([1, 2, 1])
@@ -160,15 +164,26 @@ def main():
         # Process and predict
         if st.button("🚀 Predict Digit", type="primary", use_container_width=True):
             if classifier is not None:
+                # Progress bar
+                progress = st.progress(0)
+                for i in range(0, 100, 10):
+                    progress.progress(i + 10)
+                    import time; time.sleep(0.05)
+
                 with st.spinner("🔄 Processing your image..."):
-                    # Preprocess image
                     processed_image, pil_image = preprocess_image(uploaded_file)
-                    
+
                     if processed_image is not None:
-                        # Make prediction
                         prediction, confidence = predict_digit(processed_image, classifier)
                         
-                        if prediction != "Error in prediction" and prediction != "Model not loaded":
+                        if prediction not in ["Error in prediction", "Model not loaded"]:
+                            # Save to history
+                            st.session_state.history.append({
+                                "digit": prediction,
+                                "confidence": confidence,
+                                "filename": uploaded_file.name
+                            })
+
                             # Display result
                             st.markdown(f"""
                             <div class="result-box">
@@ -179,16 +194,20 @@ def main():
                             </div>
                             """, unsafe_allow_html=True)
                             
-                            # Show processed image info
                             st.success(f"✅ Successfully processed and predicted: **{prediction}** with {confidence:.1f}% confidence")
-                            
                         else:
                             st.error(f"❌ {prediction}")
                     else:
                         st.error("❌ Failed to process the image. Please try a different image.")
             else:
                 st.error("❌ Model not available. Please check if the model file exists.")
-    
+
+    # Show prediction history
+    if st.session_state.history:
+        st.markdown("### 📜 Prediction History")
+        for item in reversed(st.session_state.history[-5:]):  # Show last 5
+            st.info(f"🖼️ **{item['filename']}** → Predicted: **{item['digit']}** ({item['confidence']:.1f}%)")
+
     # Footer
     st.markdown("---")
     st.markdown("""
@@ -197,6 +216,7 @@ def main():
         <p>Upload a digit image to see the magic! ✨</p>
     </div>
     """, unsafe_allow_html=True)
+
 
 if __name__ == "__main__":
     main()
